@@ -1,0 +1,31 @@
+Paralelizar o que for possível
+
+Adicionar - itens (de forma generica)
+
+melhorar os spaws -> deixar os dados guardados em banco,
+
+melhorar o swaws dos mobs -> 
+ 
+ Deixar tudo em banco os dados dos mobs:
+- velocidade
+- posição no mundo
+- range de ataque
+- velocidade de ataque
+- velocidade de corrida
+- skills e recarga de skills
+- biblioteca de navegação -> para os inimigos conhecer o mapa e não ficar travando
+- animações
+
+
+inicial perante ao primeiro mundo.
+se for deixar aleatorio os monstros o que é bem legal, criar no mundo regios onde eles possam estar.
+
+
+
+Personagem:
+- Melhorar a movimentação
+- Animação
+- 1 Pessoa e 3 Pessoa
+- skills
+- equipar itens
+- deslizar em obstaculos.
