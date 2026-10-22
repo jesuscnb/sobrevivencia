@@ -3,18 +3,24 @@ package main
 func coletarAlvo(jogo *Jogo, mira ResultadoMira) {
 	switch mira.tipoAlvo {
 	case AlvoCubo:
-		jogo.mundo.cubos[mira.indiceAlvo].Existe = false
-		jogo.mundo.ocupacao.remover(jogo.mundo.cubos[mira.indiceAlvo].ID)
+		cubo := &jogo.mundo.cubos[mira.indiceAlvo]
+		cubo.Existe = false
+		jogo.mundo.ocupacao.remover(cubo.ID)
+		jogo.mundo.recursosRemovidos[cubo.ID] = struct{}{}
 		jogo.cubosColetados++
 
 	case AlvoArvore:
-		jogo.mundo.arvores[mira.indiceAlvo].Existe = false
-		jogo.mundo.ocupacao.remover(jogo.mundo.arvores[mira.indiceAlvo].ID)
+		arvore := &jogo.mundo.arvores[mira.indiceAlvo]
+		arvore.Existe = false
+		jogo.mundo.ocupacao.remover(arvore.ID)
+		jogo.mundo.recursosRemovidos[arvore.ID] = struct{}{}
 		jogo.inventario.Madeira++
 
 	case AlvoRocha:
-		jogo.mundo.rochas[mira.indiceAlvo].Existe = false
-		jogo.mundo.ocupacao.remover(jogo.mundo.rochas[mira.indiceAlvo].ID)
+		rocha := &jogo.mundo.rochas[mira.indiceAlvo]
+		rocha.Existe = false
+		jogo.mundo.ocupacao.remover(rocha.ID)
+		jogo.mundo.recursosRemovidos[rocha.ID] = struct{}{}
 		jogo.inventario.Pedra++
 	}
 }

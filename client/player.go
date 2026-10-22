@@ -75,40 +75,34 @@ func atualizarJogador(jogo *Jogo) {
 		jogo.camera.Target.Z += diferencaZ
 	}
 
-	// O terreno vai de -8 a 8. Deixamos 0,5 de margem para o corpo.
-	const limiteJogador float32 = 7.5
+	chao := jogo.mundo.chaoCarregado(
+		jogo.camera.Position.X,
+		jogo.camera.Position.Z,
+		raioJogador,
+	)
 
-	xAnterior := jogo.camera.Position.X
-	zAnterior := jogo.camera.Position.Z
+	if !chao.Hit {
+		// A posição tentada não tem terreno pronto ou não tem chão.
+		diferencaX := posicaoAnterior.X - jogo.camera.Position.X
+		diferencaZ := posicaoAnterior.Z - jogo.camera.Position.Z
 
-	if jogo.camera.Position.X < -limiteJogador {
-		jogo.camera.Position.X = -limiteJogador
-	} else if jogo.camera.Position.X > limiteJogador {
-		jogo.camera.Position.X = limiteJogador
-	}
+		jogo.camera.Position.X = posicaoAnterior.X
+		jogo.camera.Position.Z = posicaoAnterior.Z
+		jogo.camera.Target.X += diferencaX
+		jogo.camera.Target.Z += diferencaZ
 
-	if jogo.camera.Position.Z < -limiteJogador {
-		jogo.camera.Position.Z = -limiteJogador
-	} else if jogo.camera.Position.Z > limiteJogador {
-		jogo.camera.Position.Z = limiteJogador
-	}
-
-	// Desloca o alvo junto com a câmera para preservar a direção da visão.
-	jogo.camera.Target.X += jogo.camera.Position.X - xAnterior
-	jogo.camera.Target.Z += jogo.camera.Position.Z - zAnterior
-
-	malhas := jogo.mundo.modeloTerreno.GetMeshes()
-	if len(malhas) > 0 {
-		raioParaBaixo := rl.NewRay(
-			rl.NewVector3(jogo.camera.Position.X, 5, jogo.camera.Position.Z),
-			rl.NewVector3(0, -1, 0),
+		chao = jogo.mundo.chaoCarregado(
+			posicaoAnterior.X,
+			posicaoAnterior.Z,
+			raioJogador,
 		)
-		chao := rl.GetRayCollisionMesh(raioParaBaixo, malhas[0], jogo.mundo.modeloTerreno.Transform)
-		if chao.Hit {
-			alturaDosOlhos := chao.Point.Y + 1.7
-			diferenca := alturaDosOlhos - jogo.camera.Position.Y
-			jogo.camera.Position.Y += diferenca
-			jogo.camera.Target.Y += diferenca
-		}
 	}
+
+	if chao.Hit {
+		alturaDosOlhos := chao.Point.Y + 1.7
+		diferenca := alturaDosOlhos - jogo.camera.Position.Y
+		jogo.camera.Position.Y += diferenca
+		jogo.camera.Target.Y += diferenca
+	}
+
 }

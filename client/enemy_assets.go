@@ -44,10 +44,19 @@ type definicaoVisualInimigo struct {
 
 func carregarVisualInimigo(def definicaoVisualInimigo) (VisualInimigo, error) {
 	modelo := rl.LoadModel(def.Caminho)
-	if !rl.IsModelValid(modelo) {
+	// Modelos animados em CPU podem ter ossos sem VBOs de skinning na GPU.
+	// IsModelValid exige esses VBOs, embora a geometria e as animações funcionem.
+	if modelo.MeshCount == 0 || modelo.MaterialCount == 0 ||
+		modelo.Meshes == nil || modelo.Materials == nil {
 		return VisualInimigo{}, fmt.Errorf(
 			"não foi possível carregar %s", def.Caminho,
 		)
+	}
+	for _, malha := range modelo.GetMeshes() {
+		if malha.VertexCount == 0 || malha.Vertices == nil || malha.VaoID == 0 {
+			descarregarModelos([]rl.Model{modelo})
+			return VisualInimigo{}, fmt.Errorf("malha inválida em %s", def.Caminho)
+		}
 	}
 
 	limites := rl.GetModelBoundingBox(modelo)

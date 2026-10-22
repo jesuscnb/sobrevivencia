@@ -70,11 +70,7 @@ func calcularMira(jogo *Jogo) ResultadoMira {
 	)
 	raioMira := rl.GetScreenToWorldRay(centroTela, jogo.camera)
 
-	var colisaoTerreno rl.RayCollision
-	malhas := jogo.mundo.modeloTerreno.GetMeshes()
-	if len(malhas) > 0 {
-		colisaoTerreno = rl.GetRayCollisionMesh(raioMira, malhas[0], jogo.mundo.modeloTerreno.Transform)
-	}
+	colisaoTerreno := jogo.mundo.colisaoTerreno(raioMira)
 
 	tipoAlvo := AlvoNenhum
 	indiceAlvo := -1

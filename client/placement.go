@@ -6,19 +6,13 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-func posicaoNoTerreno(terreno, modelo rl.Model, x, z, escala, inclinacaoMinima float32) (rl.Vector3, bool) {
-
-	malhas := terreno.GetMeshes()
-	if len(malhas) == 0 {
-		return rl.Vector3{}, false
-	}
-
+func posicaoNoTerreno(mundo *Mundo, modelo rl.Model, x, z, escala, inclinacaoMinima float32) (rl.Vector3, bool) {
 	raio := rl.NewRay(
 		rl.NewVector3(x, 5, z),
 		rl.NewVector3(0, -1, 0),
 	)
 
-	chao := rl.GetRayCollisionMesh(raio, malhas[0], terreno.Transform)
+	chao := mundo.colisaoTerreno(raio)
 
 	if !chao.Hit || chao.Normal.Y < inclinacaoMinima {
 		return rl.Vector3{}, false
@@ -50,11 +44,7 @@ func areasXZSobrepostas(a, b AreaXZ) bool {
 		a.MaxZ > b.MinZ
 }
 
-func pisoTemApoio(terreno rl.Model, area AreaXZ, alturaBase float32) bool {
-	malhas := terreno.GetMeshes()
-	if len(malhas) == 0 {
-		return false
-	}
+func pisoTemApoio(mundo *Mundo, area AreaXZ, alturaBase float32) bool {
 
 	const margem float32 = 0.1
 	const desnivelMaximo float32 = 0.35
@@ -73,7 +63,8 @@ func pisoTemApoio(terreno rl.Model, area AreaXZ, alturaBase float32) bool {
 			rl.NewVector3(ponto[0], 5, ponto[1]),
 			rl.NewVector3(0, -1, 0),
 		)
-		chao := rl.GetRayCollisionMesh(raio, malhas[0], terreno.Transform)
+
+		chao := mundo.colisaoTerreno(raio)
 
 		if !chao.Hit || chao.Normal.Y < inclinacaoMinima {
 			return false

@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-const versaoFormatoSave = 4
+const versaoFormatoSave = 5
 
 type VetorSalvo struct {
 	X float32 `json:"x"`
@@ -118,54 +119,88 @@ func capturarPartida(jogo *Jogo) (PartidaSalva, error) {
 		Inimigos:          make([]InimigoSalvo, 0, len(jogo.mundo.inimigos)),
 	}
 
-	var campoOriginal [17][9][17]float32
-	preencherCampo(&campoOriginal, novoRuido(jogo.mundo.semente))
+	// Confere se regiões carregadas concordam na borda e com os cortes registrados.
+	amostrasVistas := make(map[CoordAmostraTerreno]float32)
 
-	for ix := range jogo.mundo.campo {
-		for iy := range jogo.mundo.campo[ix] {
-			for iz := range jogo.mundo.campo[ix][iy] {
-				densidadeAtual := jogo.mundo.campo[ix][iy][iz]
-				if densidadeAtual == campoOriginal[ix][iy][iz] {
-					continue
+	for _, regiao := range jogo.mundo.regioes {
+		for ix := range regiao.Campo {
+			for iy := range regiao.Campo[ix] {
+				for iz := range regiao.Campo[ix][iy] {
+					chave := CoordAmostraTerreno{
+						X: int(regiao.Coord.X)*tamanhoRegiaoXZ + ix - tamanhoRegiaoXZ/2,
+						Y: int(regiao.Coord.Y)*tamanhoRegiaoY + iy - tamanhoRegiaoY/2,
+						Z: int(regiao.Coord.Z)*tamanhoRegiaoXZ + iz - tamanhoRegiaoXZ/2,
+					}
+					atual := regiao.Campo[ix][iy][iz]
+
+					if anterior, existe := amostrasVistas[chave]; existe && anterior != atual {
+						return PartidaSalva{}, fmt.Errorf(
+							"densidades diferentes na borda da amostra %v", chave,
+						)
+					}
+					amostrasVistas[chave] = atual
+
+					if registrada, existe := jogo.mundo.alteracoesTerreno[chave]; existe && registrada != atual {
+						return PartidaSalva{}, fmt.Errorf(
+							"corte registrado difere do terreno na amostra %v", chave,
+						)
+					}
 				}
-
-				estado.AlteracoesTerreno = append(
-					estado.AlteracoesTerreno,
-					AmostraTerrenoSalva{
-						X:         ix - 8,
-						Y:         iy - 4,
-						Z:         iz - 8,
-						Densidade: densidadeAtual,
-					},
-				)
 			}
 		}
 	}
 
-	for _, cubo := range jogo.mundo.cubos {
-		if !cubo.Existe {
-			estado.RecursosRemovidos = append(
-				estado.RecursosRemovidos,
-				recursoParaSave("cubo", cubo.ID),
-			)
-		}
+	// O save vem do mapa global, inclusive para regiões que não estejam carregadas.
+	for chave, densidade := range jogo.mundo.alteracoesTerreno {
+		estado.AlteracoesTerreno = append(estado.AlteracoesTerreno, AmostraTerrenoSalva{
+			X: chave.X, Y: chave.Y, Z: chave.Z, Densidade: densidade,
+		})
 	}
-	for _, arvore := range jogo.mundo.arvores {
-		if !arvore.Existe {
-			estado.RecursosRemovidos = append(
-				estado.RecursosRemovidos,
-				recursoParaSave("arvore", arvore.ID),
-			)
+
+	sort.Slice(estado.AlteracoesTerreno, func(i, j int) bool {
+		a := estado.AlteracoesTerreno[i]
+		b := estado.AlteracoesTerreno[j]
+		if a.X != b.X {
+			return a.X < b.X
 		}
-	}
-	for _, rocha := range jogo.mundo.rochas {
-		if !rocha.Existe {
-			estado.RecursosRemovidos = append(
-				estado.RecursosRemovidos,
-				recursoParaSave("rocha", rocha.ID),
-			)
+		if a.Y != b.Y {
+			return a.Y < b.Y
 		}
+		return a.Z < b.Z
+	})
+
+	for id := range jogo.mundo.recursosRemovidos {
+		var tipo string
+		switch id.Tipo {
+		case TipoCubo:
+			tipo = "cubo"
+		case TipoArvore:
+			tipo = "arvore"
+		case TipoRocha:
+			tipo = "rocha"
+		default:
+			return PartidaSalva{}, fmt.Errorf("tipo de recurso removido inválido: %d", id.Tipo)
+		}
+
+		estado.RecursosRemovidos = append(
+			estado.RecursosRemovidos,
+			recursoParaSave(tipo, id),
+		)
 	}
+
+	sort.Slice(estado.RecursosRemovidos, func(i, j int) bool {
+		a, b := estado.RecursosRemovidos[i], estado.RecursosRemovidos[j]
+		if a.Tipo != b.Tipo {
+			return a.Tipo < b.Tipo
+		}
+		if a.RegiaoX != b.RegiaoX {
+			return a.RegiaoX < b.RegiaoX
+		}
+		if a.RegiaoZ != b.RegiaoZ {
+			return a.RegiaoZ < b.RegiaoZ
+		}
+		return a.Ordem < b.Ordem
+	})
 
 	for _, peca := range jogo.mundo.construcoes {
 		var tipo string

@@ -40,13 +40,15 @@ type Inimigo struct {
 	Visual          TipoVisualInimigo
 }
 
-func gerarInimigo(terreno rl.Model, ocupacao *IndiceOcupacao, semente int, posicaoJogador rl.Vector3, visual TipoVisualInimigo, existentes []Inimigo) (Inimigo, bool) {
-	malhas := terreno.GetMeshes()
-	if len(malhas) == 0 {
-		return Inimigo{}, false
-	}
+func gerarInimigo(
+	mundo *Mundo,
+	ocupacao *IndiceOcupacao,
+	semente int,
+	posicaoJogador rl.Vector3,
+	visual TipoVisualInimigo,
+	existentes []Inimigo,
+	regiao RegiaoGeracao) (Inimigo, bool) {
 
-	regiao := regiaoInicial()
 	candidatos := gerarCandidatos(TipoInimigo, int64(semente), regiao, 100)
 
 	for _, candidato := range candidatos {
@@ -56,7 +58,7 @@ func gerarInimigo(terreno rl.Model, ocupacao *IndiceOcupacao, semente int, posic
 			rl.NewVector3(0, -1, 0),
 		)
 
-		chao := rl.GetRayCollisionMesh(raio, malhas[0], terreno.Transform)
+		chao := mundo.colisaoTerreno(raio)
 
 		if !chao.Hit || chao.Normal.Y < 0.85 {
 			continue
@@ -103,14 +105,17 @@ func gerarInimigo(terreno rl.Model, ocupacao *IndiceOcupacao, semente int, posic
 func (mundo *Mundo) iniciarInimigo(posicaoJogador rl.Vector3) bool {
 	mundo.inimigos = nil
 
+	regiao := regiaoGeracaoParaTipo(CoordRegiaoTerreno{}, TipoInimigo, mundo.versaoGerador)
+
 	for _, visual := range []TipoVisualInimigo{VisualOrc, VisualBlob, VisualGhost} {
 		inimigo, ok := gerarInimigo(
-			mundo.modeloTerreno,
+			mundo,
 			mundo.ocupacao,
 			mundo.semente,
 			posicaoJogador,
 			visual,
 			mundo.inimigos,
+			regiao,
 		)
 		if !ok {
 			fmt.Printf("Nenhum ponto livre para o inimigo visual %d\n", visual)
@@ -124,19 +129,12 @@ func (mundo *Mundo) iniciarInimigo(posicaoJogador rl.Vector3) bool {
 }
 
 func (mundo *Mundo) passoLivreInimigo(atual, tentativa rl.Vector3) (rl.Vector3, bool) {
-	malhas := mundo.modeloTerreno.GetMeshes()
-	if len(malhas) == 0 {
-		return rl.Vector3{}, false
-	}
-
 	raio := rl.NewRay(
 		rl.NewVector3(tentativa.X, 5, tentativa.Z),
 		rl.NewVector3(0, -1, 0),
 	)
 
-	chao := rl.GetRayCollisionMesh(
-		raio, malhas[0], mundo.modeloTerreno.Transform,
-	)
+	chao := mundo.colisaoTerreno(raio)
 
 	if !chao.Hit || chao.Normal.Y < 0.85 {
 		return rl.Vector3{}, false
@@ -303,6 +301,10 @@ func (mundo *Mundo) atualizarInimigos(delta float32, posicaoJogador rl.Vector3) 
 		inimigo := &mundo.inimigos[i]
 
 		if inimigo.Vida <= 0 {
+			continue
+		}
+
+		if !mundo.superficieCarregada(inimigo.Posicao.X, inimigo.Posicao.Z) {
 			continue
 		}
 

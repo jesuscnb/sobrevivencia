@@ -74,6 +74,7 @@ func lerPartida() (PartidaSalva, error) {
 	if estado.VersaoFormato != 1 &&
 		estado.VersaoFormato != 2 &&
 		estado.VersaoFormato != 3 &&
+		estado.VersaoFormato != 4 &&
 		estado.VersaoFormato != versaoFormatoSave {
 		return PartidaSalva{}, fmt.Errorf(
 			"versão do save incompatível: %d",
@@ -81,7 +82,8 @@ func lerPartida() (PartidaSalva, error) {
 		)
 	}
 
-	if estado.Geracao.VersaoGerador != versaoGerador {
+	if estado.Geracao.VersaoGerador != versaoGeradorAnterior &&
+		estado.Geracao.VersaoGerador != versaoGerador {
 		return PartidaSalva{}, fmt.Errorf(
 			"versão do gerador incompatível: %d",
 			estado.Geracao.VersaoGerador,

@@ -2,6 +2,8 @@ package main
 
 import rl "github.com/gen2brain/raylib-go/raylib"
 
+const margemRemocaoGrama float32 = 0.4
+
 type Grama struct {
 	ID      IDObjeto
 	Posicao rl.Vector3
@@ -9,24 +11,16 @@ type Grama struct {
 	Rotacao float32
 }
 
-func gerarGrama(terreno, modeloGrama rl.Model, indice *IndiceOcupacao, semente int) []Grama {
-	const quantidade = 80
-	const maxTentativas = 400
-
+func gerarGrama(mundo *Mundo, modeloGrama rl.Model, indice *IndiceOcupacao, regiao RegiaoGeracao, candidatos []CandidatoObjeto, quantidade int) []Grama {
 	gramas := make([]Grama, 0, quantidade)
-	regiao := regiaoInicial()
-	candidatos := gerarCandidatos(TipoGrama, int64(semente), regiao, maxTentativas)
 
-	for _, candidato := range candidatos {
-		if len(gramas) >= quantidade {
-			break
-		}
-		posicao, ok := posicaoNoTerreno(terreno, modeloGrama, candidato.X, candidato.Z, candidato.Escala, 0.9)
+	tentar := func(candidato CandidatoObjeto) {
+		posicao, ok := posicaoNoTerreno(mundo, modeloGrama, candidato.X, candidato.Z, candidato.Escala, 0.9)
 		if !ok {
-			continue
+			return
 		}
 		if !podePosicionar(indice, TipoGrama, posicao) {
-			continue
+			return
 		}
 
 		gramas = append(gramas, Grama{
@@ -36,20 +30,70 @@ func gerarGrama(terreno, modeloGrama rl.Model, indice *IndiceOcupacao, semente i
 			Rotacao: candidato.Rotacao,
 		})
 		registrarOcupacao(indice, gramas[len(gramas)-1].ID, TipoGrama, posicao)
+	}
 
+	for _, candidato := range candidatos {
+		if len(gramas) >= quantidade {
+			break
+		}
+		tentar(candidato)
 	}
 
 	return gramas
 }
 
+func (mundo *Mundo) carregarGramaRegiao(coord CoordRegiaoTerreno, modelo rl.Model) {
+	regiao := mundo.regioes[coord]
+	if coord.Y != 0 || regiao == nil || regiao.GramaCarregada {
+		return
+	}
+
+	area := regiaoGeracaoParaTipo(coord, TipoGrama, mundo.versaoGerador)
+	candidatos := gerarCandidatos(TipoGrama, int64(mundo.semente), area, 400)
+	novas := gerarGrama(mundo, modelo, mundo.ocupacao, area, candidatos, 80)
+	mundo.gramas = append(mundo.gramas, novas...)
+	regiao.GramaCarregada = true
+	mundo.removerGramaSobrePisos(area.Area)
+}
+
+func (mundo *Mundo) removerGramaSobrePisos(area AreaXZ) {
+	// Pisos salvos podem já existir quando esta região é carregada.
+	buscaPisos := AreaXZ{
+		MinX: area.MinX - margemRemocaoGrama,
+		MaxX: area.MaxX + margemRemocaoGrama,
+		MinZ: area.MinZ - margemRemocaoGrama,
+		MaxZ: area.MaxZ + margemRemocaoGrama,
+	}
+	for _, registro := range mundo.ocupacao.consultar(buscaPisos) {
+		if registro.Tipo == TipoPiso {
+			mundo.removerGramaNaArea(registro.Area)
+		}
+	}
+}
+
+func (mundo *Mundo) descarregarGramaRegiao(coord CoordRegiaoTerreno) {
+	if coord.Y != 0 {
+		return
+	}
+
+	restantes := mundo.gramas[:0]
+	for _, grama := range mundo.gramas {
+		if grama.ID.RegiaoX == coord.X && grama.ID.RegiaoZ == coord.Z {
+			mundo.ocupacao.remover(grama.ID)
+			continue
+		}
+		restantes = append(restantes, grama)
+	}
+	mundo.gramas = restantes
+}
+
 func (mundo *Mundo) removerGramaNaArea(areaPiso AreaXZ) {
-	const margem float32 = 0.4
 
 	areaLimpeza := AreaXZ{
-		MinX: areaPiso.MinX - margem,
-		MaxX: areaPiso.MaxX + margem,
-		MinZ: areaPiso.MinZ - margem,
-		MaxZ: areaPiso.MaxZ + margem,
+		MinX: areaPiso.MinX - margemRemocaoGrama,
+		MaxX: areaPiso.MaxX + margemRemocaoGrama,
+		MinZ: areaPiso.MinZ - margemRemocaoGrama,
+		MaxZ: areaPiso.MaxZ + margemRemocaoGrama,
 	}
 
 	idsRemovidos := make(map[IDObjeto]struct{})

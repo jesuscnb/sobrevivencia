@@ -33,8 +33,9 @@ func calcularPreviaPiso(jogo *Jogo, mira ResultadoMira) PreviaConstrucao {
 	modelo := jogo.catalogo.modeloObrigatorio(TipoPiso)
 	escala := jogo.catalogo.escala(TipoPiso)
 	posicao, ok := posicaoNoTerreno(
-		jogo.mundo.modeloTerreno, modelo, x, z, escala, -1,
+		&jogo.mundo, modelo, x, z, escala, -1,
 	)
+
 	if !ok {
 		return PreviaConstrucao{}
 	}
@@ -75,7 +76,7 @@ func calcularPreviaPiso(jogo *Jogo, mira ResultadoMira) PreviaConstrucao {
 	if podeColocar {
 		baseDoPiso := posicao.Y + rl.GetModelBoundingBox(modelo).Min.Y*escala
 
-		if !pisoTemApoio(jogo.mundo.modeloTerreno, areaNova, baseDoPiso) {
+		if !pisoTemApoio(&jogo.mundo, areaNova, baseDoPiso) {
 			podeColocar = false
 		}
 	}

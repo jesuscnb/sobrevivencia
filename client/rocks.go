@@ -11,24 +11,18 @@ type Rocha struct {
 }
 
 func gerarRochas(
-	terreno, modeloRocha rl.Model,
+	mundo *Mundo, modeloRocha rl.Model,
 	indice *IndiceOcupacao,
-	semente int,
+	regiao RegiaoGeracao,
+	candidatos []CandidatoObjeto,
+	quantidade int,
 ) []Rocha {
-	const quantidade = 4
-	const maxTentativas = 200
-
 	rochas := make([]Rocha, 0, quantidade)
-	regiao := regiaoInicial()
-	candidatos := gerarCandidatos(TipoRocha, int64(semente), regiao, maxTentativas)
 
-	for _, candidato := range candidatos {
-		if len(rochas) >= quantidade {
-			break
-		}
-		posicao, ok := posicaoNoTerreno(terreno, modeloRocha, candidato.X, candidato.Z, escalaRocha, 0.9)
+	tentar := func(candidato CandidatoObjeto) {
+		posicao, ok := posicaoNoTerreno(mundo, modeloRocha, candidato.X, candidato.Z, escalaRocha, 0.9)
 		if !ok {
-			continue
+			return
 		}
 		if podePosicionar(indice, TipoRocha, posicao) {
 			rocha := Rocha{
@@ -41,7 +35,51 @@ func gerarRochas(
 		}
 	}
 
+	for _, candidato := range candidatos {
+		if len(rochas) >= quantidade {
+			break
+		}
+		tentar(candidato)
+	}
+
 	return rochas
+}
+
+func (mundo *Mundo) carregarRochasRegiao(coord CoordRegiaoTerreno, modelo rl.Model) {
+	regiao := mundo.regioes[coord]
+	if coord.Y != 0 || regiao == nil || regiao.RochasCarregadas {
+		return
+	}
+
+	area := regiaoGeracaoParaTipo(coord, TipoRocha, mundo.versaoGerador)
+	candidatos := gerarCandidatos(TipoRocha, int64(mundo.semente), area, 200)
+	novas := gerarRochas(mundo, modelo, mundo.ocupacao, area, candidatos, 4)
+
+	for i := range novas {
+		if _, removida := mundo.recursosRemovidos[novas[i].ID]; removida {
+			novas[i].Existe = false
+			mundo.ocupacao.remover(novas[i].ID)
+		}
+	}
+
+	mundo.rochas = append(mundo.rochas, novas...)
+	regiao.RochasCarregadas = true
+}
+
+func (mundo *Mundo) descarregarRochasRegiao(coord CoordRegiaoTerreno) {
+	if coord.Y != 0 {
+		return
+	}
+
+	restantes := mundo.rochas[:0]
+	for _, rocha := range mundo.rochas {
+		if rocha.ID.RegiaoX == coord.X && rocha.ID.RegiaoZ == coord.Z {
+			mundo.ocupacao.remover(rocha.ID)
+			continue
+		}
+		restantes = append(restantes, rocha)
+	}
+	mundo.rochas = restantes
 }
 
 func caixaDaRocha(posicao rl.Vector3, limites rl.BoundingBox) rl.BoundingBox {

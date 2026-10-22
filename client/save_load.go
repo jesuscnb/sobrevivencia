@@ -9,7 +9,7 @@ import (
 
 // Aplica ao mundo recém-gerado os recursos que não existem mais no save.
 // Retorna quantos cubos foram coletados para restaurar o contador da tela.
-func aplicarRecursosRemovidos(mundo *Mundo, recursos []RecursoRemovidoSalvo) (int, error) {
+func aplicarRecursosRemovidos(mundo *Mundo, versao int, recursos []RecursoRemovidoSalvo) (int, error) {
 	vistos := make(map[IDObjeto]struct{}, len(recursos))
 	cubosColetados := 0
 
@@ -69,16 +69,26 @@ func aplicarRecursosRemovidos(mundo *Mundo, recursos []RecursoRemovidoSalvo) (in
 		}
 
 		if !encontrado {
-			return 0, fmt.Errorf("recurso do save não encontrado no mundo: %+v", id)
+			// Cubos e recursos da região inicial já devem existir neste momento.
+			// Em saves antigos, todos os recursos também precisam estar carregados.
+			bordaPendente := mundo.versaoGerador <= versaoGeradorAnterior &&
+				((id.Tipo == TipoArvore && id.Ordem >= 100) ||
+					(id.Tipo == TipoRocha && id.Ordem >= 200))
+			if versao < 5 || id.Tipo == TipoCubo ||
+				(id.RegiaoX == 0 && id.RegiaoZ == 0 && !bordaPendente) {
+				return 0, fmt.Errorf("recurso do save não encontrado no mundo: %+v", id)
+			}
+		} else {
+			mundo.ocupacao.remover(id)
 		}
 
-		mundo.ocupacao.remover(id)
+		mundo.recursosRemovidos[id] = struct{}{}
 	}
 
 	return cubosColetados, nil
 }
 
-func aplicarConstrucoes(mundo *Mundo, catalogo *Catalogo, construcoes []PecaSalva) error {
+func aplicarConstrucoes(mundo *Mundo, catalogo *Catalogo, versao int, construcoes []PecaSalva) error {
 	for indice, salva := range construcoes {
 		var tipo TipoObjeto
 
@@ -101,13 +111,25 @@ func aplicarConstrucoes(mundo *Mundo, catalogo *Catalogo, construcoes []PecaSalv
 			return fmt.Errorf("construção %d tem escala incompatível", indice)
 		}
 
-		const limitePosicao float32 = 16
 		p := salva.Posicao
 
-		if p.X < -limitePosicao || p.X > limitePosicao ||
-			p.Y < -limitePosicao || p.Y > limitePosicao ||
-			p.Z < -limitePosicao || p.Z > limitePosicao {
-			return fmt.Errorf("construção %d está fora do mundo atual", indice)
+		for _, valor := range [3]float32{p.X, p.Y, p.Z} {
+			if math.IsNaN(float64(valor)) || math.IsInf(float64(valor), 0) {
+				return fmt.Errorf("construção %d tem posição inválida", indice)
+			}
+		}
+
+		const limitePosicao float32 = 16
+		if p.Y < -limitePosicao || p.Y > limitePosicao {
+			return fmt.Errorf("construção %d tem altura inválida", indice)
+		}
+
+		if versao <= 4 {
+			// Preserva a validação dos saves antigos.
+			if p.X < -limitePosicao || p.X > limitePosicao ||
+				p.Z < -limitePosicao || p.Z > limitePosicao {
+				return fmt.Errorf("construção %d está fora do mundo antigo", indice)
+			}
 		}
 
 		posicao := rl.NewVector3(
@@ -136,20 +158,33 @@ func restaurarPartida(jogo *Jogo, estado PartidaSalva) error {
 	mundoNovo := novoMundo(
 		novoRuido(estado.Geracao.Semente),
 		estado.Geracao.Semente,
+		estado.Geracao.VersaoGerador,
 		&jogo.catalogo,
 	)
 
-	err := aplicarAlteracoesTerreno(&mundoNovo, estado.AlteracoesTerreno)
+	err := aplicarAlteracoesTerreno(
+		&mundoNovo,
+		estado.VersaoFormato,
+		estado.AlteracoesTerreno,
+	)
+
 	cubosColetados := 0
 
 	if err == nil {
 		cubosColetados, err = aplicarRecursosRemovidos(
-			&mundoNovo, estado.RecursosRemovidos,
+			&mundoNovo,
+			estado.VersaoFormato,
+			estado.RecursosRemovidos,
 		)
 	}
 
 	if err == nil {
-		err = aplicarConstrucoes(&mundoNovo, &jogo.catalogo, estado.Construcoes)
+		err = aplicarConstrucoes(&mundoNovo, &jogo.catalogo, estado.VersaoFormato, estado.Construcoes)
+	}
+
+	if err == nil {
+		mundoNovo.carregarBordaVegetacaoRegiao(CoordRegiaoTerreno{}, &jogo.catalogo)
+		mundoNovo.carregarBordaVegetacaoRegiao(CoordRegiaoTerreno{X: 1}, &jogo.catalogo)
 	}
 
 	if err == nil && estado.VersaoFormato >= 3 {
@@ -157,7 +192,7 @@ func restaurarPartida(jogo *Jogo, estado PartidaSalva) error {
 	}
 
 	if err != nil {
-		rl.UnloadModel(mundoNovo.modeloTerreno)
+		mundoNovo.descarregarTerreno()
 		return err
 	}
 
@@ -172,7 +207,7 @@ func restaurarPartida(jogo *Jogo, estado PartidaSalva) error {
 		}
 	}
 
-	modeloAntigo := jogo.mundo.modeloTerreno
+	mundoAntigo := jogo.mundo
 	jogo.mundo = mundoNovo
 	jogo.cubosColetados = cubosColetados
 	jogo.inventario = Inventario{
@@ -197,26 +232,27 @@ func restaurarPartida(jogo *Jogo, estado PartidaSalva) error {
 	jogo.previaConstrucao = PreviaConstrucao{}
 	jogo.tipoConstrucao = TipoPiso
 
-	rl.UnloadModel(modeloAntigo)
+	mundoAntigo.descarregarTerreno()
 	return nil
 }
 
-func aplicarAlteracoesTerreno(mundo *Mundo, alteracoes []AmostraTerrenoSalva) error {
-	if len(alteracoes) == 0 {
-		return nil
-	}
+func aplicarAlteracoesTerreno(
+	mundo *Mundo,
+	versao int,
+	alteracoes []AmostraTerrenoSalva,
+) error {
+	vistos := make(map[CoordAmostraTerreno]struct{}, len(alteracoes))
 
-	vistos := make(map[[3]int]struct{}, len(alteracoes))
-
-	// Validamos a lista inteira antes de modificar o campo.
+	// Valida tudo antes de modificar qualquer região.
 	for _, amostra := range alteracoes {
-		if amostra.X < -8 || amostra.X > 8 ||
-			amostra.Y < -4 || amostra.Y > 4 ||
-			amostra.Z < -8 || amostra.Z > 8 {
-			return fmt.Errorf("amostra do terreno fora dos limites: %+v", amostra)
+		if versao <= 4 &&
+			(amostra.X < -8 || amostra.X > 8 ||
+				amostra.Y < -4 || amostra.Y > 4 ||
+				amostra.Z < -8 || amostra.Z > 8) {
+			return fmt.Errorf("amostra do terreno fora dos limites do save antigo: %+v", amostra)
 		}
 
-		chave := [3]int{amostra.X, amostra.Y, amostra.Z}
+		chave := CoordAmostraTerreno{X: amostra.X, Y: amostra.Y, Z: amostra.Z}
 		if _, repetida := vistos[chave]; repetida {
 			return fmt.Errorf("amostra do terreno repetida: %v", chave)
 		}
@@ -226,16 +262,32 @@ func aplicarAlteracoesTerreno(mundo *Mundo, alteracoes []AmostraTerrenoSalva) er
 		if math.IsNaN(densidade) || math.IsInf(densidade, 0) {
 			return fmt.Errorf("densidade inválida na amostra %v", chave)
 		}
+
 	}
 
+	alteradas := make(map[CoordRegiaoTerreno]struct{})
 	for _, amostra := range alteracoes {
-		mundo.campo[amostra.X+8][amostra.Y+4][amostra.Z+8] = amostra.Densidade
+
+		chave := CoordAmostraTerreno{X: amostra.X, Y: amostra.Y, Z: amostra.Z}
+		mundo.alteracoesTerreno[chave] = amostra.Densidade
+
+		for coord, regiao := range mundo.regioes {
+			ix, iy, iz, pertence := regiao.indicesDaAmostraGlobal(
+				amostra.X, amostra.Y, amostra.Z,
+			)
+			if !pertence {
+				continue
+			}
+
+			regiao.Campo[ix][iy][iz] = amostra.Densidade
+			alteradas[coord] = struct{}{}
+		}
 	}
 
-	// Reconstruímos a malha uma vez, depois de aplicar todas as mudanças.
-	modeloNovo := criarModeloTerreno(&mundo.campo)
-	rl.UnloadModel(mundo.modeloTerreno)
-	mundo.modeloTerreno = modeloNovo
+	for coord := range alteradas {
+		mundo.reconstruirRegiaoTerreno(mundo.regioes[coord])
+	}
+
 	return nil
 }
 

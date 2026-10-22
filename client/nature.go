@@ -10,8 +10,8 @@ type Arvore struct {
 
 const escalaArvore float32 = 3
 
-func criarArvoreNoTerreno(terreno, modeloArvore rl.Model, x, z float32) (Arvore, bool) {
-	posicao, ok := posicaoNoTerreno(terreno, modeloArvore, x, z, escalaArvore, 0.85)
+func criarArvoreNoTerreno(mundo *Mundo, modeloArvore rl.Model, x, z float32) (Arvore, bool) {
+	posicao, ok := posicaoNoTerreno(mundo, modeloArvore, x, z, escalaArvore, 0.85)
 	if !ok {
 		return Arvore{}, false
 	}
@@ -19,21 +19,13 @@ func criarArvoreNoTerreno(terreno, modeloArvore rl.Model, x, z float32) (Arvore,
 	return Arvore{Posicao: posicao, Existe: true}, true
 }
 
-func gerarArvores(terreno, modeloArvore rl.Model, indice *IndiceOcupacao, semente int) []Arvore {
-	const quantidade = 6
-	const maxTentativas = 100
-
+func gerarArvores(mundo *Mundo, modeloArvore rl.Model, indice *IndiceOcupacao, regiao RegiaoGeracao, candidatos []CandidatoObjeto, quantidade int) []Arvore {
 	arvores := make([]Arvore, 0, quantidade)
-	regiao := regiaoInicial()
-	candidatos := gerarCandidatos(TipoArvore, int64(semente), regiao, maxTentativas)
 
-	for _, candidato := range candidatos {
-		if len(arvores) >= quantidade {
-			break
-		}
-		arvore, encontrouChao := criarArvoreNoTerreno(terreno, modeloArvore, candidato.X, candidato.Z)
+	tentar := func(candidato CandidatoObjeto) {
+		arvore, encontrouChao := criarArvoreNoTerreno(mundo, modeloArvore, candidato.X, candidato.Z)
 		if !encontrouChao {
-			continue
+			return
 		}
 
 		if podePosicionar(indice, TipoArvore, arvore.Posicao) {
@@ -43,7 +35,51 @@ func gerarArvores(terreno, modeloArvore rl.Model, indice *IndiceOcupacao, sement
 		}
 	}
 
+	for _, candidato := range candidatos {
+		if len(arvores) >= quantidade {
+			break
+		}
+		tentar(candidato)
+	}
+
 	return arvores
+}
+
+func (mundo *Mundo) carregarArvoresRegiao(coord CoordRegiaoTerreno, modelo rl.Model) {
+	regiao := mundo.regioes[coord]
+	if coord.Y != 0 || regiao == nil || regiao.ArvoresCarregadas {
+		return
+	}
+
+	area := regiaoGeracaoParaTipo(coord, TipoArvore, mundo.versaoGerador)
+	candidatos := gerarCandidatos(TipoArvore, int64(mundo.semente), area, 100)
+	novas := gerarArvores(mundo, modelo, mundo.ocupacao, area, candidatos, 6)
+
+	for i := range novas {
+		if _, removida := mundo.recursosRemovidos[novas[i].ID]; removida {
+			novas[i].Existe = false
+			mundo.ocupacao.remover(novas[i].ID)
+		}
+	}
+
+	mundo.arvores = append(mundo.arvores, novas...)
+	regiao.ArvoresCarregadas = true
+}
+
+func (mundo *Mundo) descarregarArvoresRegiao(coord CoordRegiaoTerreno) {
+	if coord.Y != 0 {
+		return
+	}
+
+	restantes := mundo.arvores[:0]
+	for _, arvore := range mundo.arvores {
+		if arvore.ID.RegiaoX == coord.X && arvore.ID.RegiaoZ == coord.Z {
+			mundo.ocupacao.remover(arvore.ID)
+			continue
+		}
+		restantes = append(restantes, arvore)
+	}
+	mundo.arvores = restantes
 }
 
 func caixaDoTronco(posicao rl.Vector3) rl.BoundingBox {

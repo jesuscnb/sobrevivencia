@@ -10,17 +10,20 @@ const escalaConstrucaoTeste float32 = 2
 
 // Jogo reúne o estado que precisa sobreviver de um quadro para o próximo.
 type Jogo struct {
-	camera           rl.Camera3D
-	mundo            Mundo
-	catalogo         Catalogo
-	cubosColetados   int
-	xRay             bool
-	inventario       Inventario
-	vida             Vida
-	modoConstrucao   bool
-	previaConstrucao PreviaConstrucao
-	tipoConstrucao   TipoObjeto
-	catalogoInimigos CatalogoInimigos
+	camera             rl.Camera3D
+	mundo              Mundo
+	catalogo           Catalogo
+	cubosColetados     int
+	xRay               bool
+	inventario         Inventario
+	vida               Vida
+	modoConstrucao     bool
+	previaConstrucao   PreviaConstrucao
+	tipoConstrucao     TipoObjeto
+	catalogoInimigos   CatalogoInimigos
+	diagnostico        DiagnosticoDesempenho
+	materialTerreno    MaterialTerreno
+	terrenoTexturizado bool
 }
 
 func novoJogo(semente int) *Jogo {
@@ -50,7 +53,9 @@ func novoJogo(semente int) *Jogo {
 		panic(err)
 	}
 
-	jogo.mundo = novoMundo(ruido, semente, &jogo.catalogo)
+	jogo.mundo = novoMundo(ruido, semente, versaoGerador, &jogo.catalogo)
+	jogo.materialTerreno = carregarMaterialTerreno(jogo.mundo.regiaoTerrenoInicial().Modelo)
+	jogo.terrenoTexturizado = true
 
 	if !jogo.mundo.iniciarInimigo(jogo.camera.Position) {
 		fmt.Println("Nenhum ponto livre para o inimigo")
@@ -64,6 +69,13 @@ func gameLoop() {
 	jogo := novoJogo(54321)
 
 	for !rl.WindowShouldClose() {
+		if rl.IsKeyPressed(rl.KeyF4) {
+			jogo.diagnostico.Visivel = !jogo.diagnostico.Visivel
+		}
+		if rl.IsKeyPressed(rl.KeyF6) {
+			jogo.terrenoTexturizado = !jogo.terrenoTexturizado
+		}
+		jogo.diagnostico.registrarQuadro(rl.GetFrameTime(), &jogo.mundo)
 
 		if rl.IsKeyPressed(rl.KeyF9) {
 			estado, err := lerPartida()
@@ -92,6 +104,15 @@ func gameLoop() {
 		}
 
 		atualizarJogador(jogo)
+
+		regiaoAtual := coordenadaRegiao(
+			jogo.camera.Position.X,
+			0,
+			jogo.camera.Position.Z,
+		)
+
+		jogo.mundo.carregarProximaRegiao(regiaoAtual, &jogo.catalogo)
+		jogo.mundo.descarregarRegiaoDistante(regiaoAtual)
 
 		if rl.IsKeyPressed(rl.KeyF2) && len(jogo.mundo.inimigos) > 0 {
 			grade := novaGradeNavegacao()
@@ -189,11 +210,7 @@ func gameLoop() {
 		}
 
 		if mira.terrenoAoAlcance && rl.IsKeyPressed(rl.KeyC) {
-			ponto := mira.colisaoTerreno.Point
-			cortarEsfera(&jogo.mundo.campo, ponto.X, ponto.Y, ponto.Z, 2)
-			novoModelo := criarModeloTerreno(&jogo.mundo.campo)
-			rl.UnloadModel(jogo.mundo.modeloTerreno)
-			jogo.mundo.modeloTerreno = novoModelo
+			jogo.mundo.cortarTerreno(mira.colisaoTerreno.Point, 2)
 		}
 
 		if rl.IsKeyPressed(rl.KeyM) {
@@ -217,7 +234,8 @@ func gameLoop() {
 		desenharJogo(jogo, mira)
 	}
 
-	rl.UnloadModel(jogo.mundo.modeloTerreno)
+	jogo.mundo.descarregarTerreno()
+	jogo.materialTerreno.descarregar()
 	jogo.catalogo.descarregar()
 	jogo.catalogoInimigos.descarregar()
 

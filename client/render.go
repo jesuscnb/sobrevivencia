@@ -15,21 +15,23 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 	rl.ClearBackground(rl.NewColor(20, 27, 39, 255))
 	rl.BeginMode3D(jogo.camera)
 
-	if jogo.xRay {
-		rl.DrawModelWires(
-			jogo.mundo.modeloTerreno,
-			rl.Vector3Zero(),
-			1,
-			color.RGBA{R: 180, G: 180, B: 180, A: 255},
-		)
-	} else {
-		rl.DrawModel(
-			jogo.mundo.modeloTerreno,
-			rl.Vector3Zero(),
-			1,
-			color.RGBA{R: 70, G: 160, B: 90, A: 255},
-		)
+	for _, regiao := range jogo.mundo.regioes {
 
+		posicao := regiao.posicaoMundo()
+		jogo.materialTerreno.usarNoModelo(regiao.Modelo, jogo.terrenoTexturizado && !jogo.xRay)
+
+		if jogo.xRay {
+			rl.DrawModelWires(
+				regiao.Modelo, posicao, 1,
+				color.RGBA{R: 180, G: 180, B: 180, A: 255},
+			)
+		} else {
+			cor := rl.White
+			if !jogo.terrenoTexturizado {
+				cor = color.RGBA{R: 70, G: 160, B: 90, A: 255}
+			}
+			rl.DrawModel(regiao.Modelo, posicao, 1, cor)
+		}
 	}
 
 	if mira.terrenoAoAlcance {
@@ -41,6 +43,11 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 	}
 
 	for _, peca := range jogo.mundo.construcoes {
+
+		if !jogo.mundo.superficieCarregada(peca.Posicao.X, peca.Posicao.Z) {
+			continue
+		}
+
 		modelo := jogo.catalogo.modeloObrigatorio(peca.Tipo)
 		rl.DrawModelEx(
 			modelo,
@@ -73,7 +80,7 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 	}
 
 	for _, cubo := range jogo.mundo.cubos {
-		if cubo.Existe {
+		if cubo.Existe && jogo.mundo.superficieCarregada(cubo.Posicao.X, cubo.Posicao.Z) {
 			rl.DrawCube(
 				cubo.Posicao,
 				1, 1, 1,
@@ -109,7 +116,7 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 
 		inimigo := &jogo.mundo.inimigos[i]
 
-		if inimigo.Vida <= 0 {
+		if inimigo.Vida <= 0 || !jogo.mundo.superficieCarregada(inimigo.Posicao.X, inimigo.Posicao.Z) {
 			continue
 		}
 
@@ -244,6 +251,7 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 			10, 190, 20, rl.White,
 		)
 	}
+	jogo.diagnostico.desenhar()
 
 	rl.EndDrawing()
 }
