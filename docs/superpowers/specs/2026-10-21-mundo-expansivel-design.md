@@ -1,6 +1,6 @@
 # Design: mundo expansível e terreno texturizado
 
-**Estado:** desenho conversacional aprovado em 21/10/2026; documento aguardando revisão do autor.
+**Estado:** desenho revisado e aprovado pelo autor em 21/10/2026; pronto para planejamento por entregas.
 
 ## Objetivo e limites
 
@@ -46,6 +46,8 @@ Registrar antes e depois de cada etapa: tempo de quadro (mediana, percentil 95 e
 
 Usar texturas pequenas e repetíveis de grama e terra/rocha, escolhidas ou produzidas com origem e licença registradas. As imagens de prévia dos kits atuais não serão presumidas como texturas de terreno. Um material/shader compartilhado por todas as regiões usa coordenadas de mundo, para manter escala e alinhamento visual nas bordas. Grama domina superfícies voltadas para cima; terra/rocha aparece em encostas, cortes e faces inferiores. Projeção triplanar ou uma composição equivalente evita esticar a textura nas faces verticais. Normais coerentes entre regiões e iluminação simples fazem parte do mesmo checkpoint visual. A quantidade de amostragens do shader deve ser medida antes de acrescentar novas camadas.
 
+Adicionar um céu estilizado ao marco de aparência para substituir o fundo de cor única. O céu deve manter horizonte e iluminação coerentes com o terreno, sem depender das regiões carregadas ou revelar suas divisas. A técnica visual será escolhida ao implementar, considerando qualidade e custo de renderização.
+
 ## Estradas e assentamentos
 
 Acima das regiões de malha haverá uma camada de **planos territoriais**. Uma célula de planejamento, maior que uma região de terreno, decide de forma reproduzível locais candidatos a assentamento e conexões de estrada. Conexões em uma fronteira são determinadas por uma chave compartilhada da fronteira, para que vizinhos concordem sem exigir que todo o mundo seja gerado. Planos têm ID estável, área ocupada e geometria lógica; uma região consulta os planos que cruzam seu volume.
@@ -67,7 +69,7 @@ Uma fronteira de armazenamento oferece operações por região e por plano terri
 1. **Duas regiões:** a inicial e uma vizinha compartilham borda; o jogador atravessa com terreno e colisão contínuos. Objetos iniciais e saves v4 continuam funcionando.
 2. **Carregamento dinâmico:** regiões próximas aparecem antes da travessia; regiões distantes são liberadas; voltar à área produz o mesmo terreno e objetos. Medir tempo de geração, tempo por quadro e uso de memória.
 3. **Escavação entre regiões:** um corte sobre a borda atualiza os dois lados e reaparece corretamente após salvar, descarregar e recarregar.
-4. **Aparência:** grama e solo exposto têm texturas estilizadas, iluminação legível e nenhuma emenda perceptível de textura ou normal.
+4. **Aparência:** grama e solo exposto têm texturas estilizadas, iluminação legível e nenhuma emenda perceptível de textura ou normal; um céu estilizado substitui o fundo de cor única e acompanha visualmente o mundo expansível.
 5. **Conteúdo territorial:** uma estrada atravessa ao menos duas regiões sem quebra; um assentamento pequeno usa assets existentes e respeita a ocupação.
 6. **Minimapa:** mostra terreno e estrada ao redor do jogador, mantém posição correta durante a travessia e preserva áreas descobertas.
 

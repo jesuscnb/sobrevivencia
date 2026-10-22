@@ -59,7 +59,7 @@ Uma mesma semente deve reconstruir o mesmo cenário. Mudanças do jogador, como 
 | 4. Sobrevivência | Coletar madeira/pedra, inventário mínimo e vida | Interação pela mira, estado do jogo e feedback | UI da stack; formato simples de save |
 | 5. Construção | Posicionar piso, parede e teto; salvar e recarregar | Prévia, encaixe, custo, validação e peças modulares | Raycast e colisão da stack escolhida |
 | 6. Ameaça | Um inimigo patrulha, persegue e ataca | Estados de IA, dano, balanceamento e animação básica | Navegação simples primeiro; biblioteca se o mapa pedir |
-| 7. Escavação e expansão | Escavar no jogo, persistir cortes; ruínas/cabanas geradas, som e mais regiões | Edição volumétrica local, colisão atualizada, composição procedural e desempenho | Mesher/colisão; Transvoxel apenas se houver níveis de detalhe diferentes |
+| 7. Escavação e expansão | Escavar no jogo, persistir cortes; ruínas/cabanas geradas, som, céu e mais regiões | Edição volumétrica local, colisão atualizada, composição procedural, aparência do ambiente e desempenho | Mesher/colisão; Transvoxel apenas se houver níveis de detalhe diferentes |
 | 8. Multiplayer, se chegar a hora | Jogadores compartilham o mundo solo já estável; quantidade e hospedagem ainda abertas | Estado autoritativo, sincronização, latência e persistência | Biblioteca de rede escolhida nessa fase |
 
 O **jogador mínimo aparece cedo** porque caminhar pelo mapa ajuda a verificar o terreno. Animações, habilidades e refinamento do personagem continuam como assunto próprio mais adiante. Nenhum marco exige muitos experimentos quase iguais.
