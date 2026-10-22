@@ -13,6 +13,7 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 	modeloGrama := jogo.catalogo.modeloObrigatorio(TipoGrama)
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.NewColor(20, 27, 39, 255))
+	jogo.ceu.desenhar(jogo.camera)
 	rl.BeginMode3D(jogo.camera)
 
 	for _, regiao := range jogo.mundo.regioes {

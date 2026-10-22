@@ -6,6 +6,7 @@ in vec3 worldNormal;
 uniform sampler2D grassTexture;
 uniform sampler2D soilTexture;
 uniform vec4 colDiffuse;
+uniform vec3 sunDirection;
 
 out vec4 finalColor;
 
@@ -29,8 +30,7 @@ void main() {
     vec3 soil = texture(soilTexture, soilUV).rgb;
     vec3 surface = mix(soil, grass, grassWeight);
 
-    vec3 sunlight = normalize(vec3(0.35, 0.85, 0.40));
-    float diffuse = max(dot(normal, sunlight), 0.0);
+    float diffuse = max(dot(normal, normalize(sunDirection)), 0.0);
     float light = 0.56 + 0.44 * diffuse;
     finalColor = vec4(surface * light * colDiffuse.rgb, colDiffuse.a);
 }

@@ -33,12 +33,14 @@ func carregarMaterialTerreno(modeloInicial rl.Model) MaterialTerreno {
 	}
 	material.localGrama = rl.GetShaderLocation(material.Shader, "grassTexture")
 	material.localSolo = rl.GetShaderLocation(material.Shader, "soilTexture")
-	if material.localGrama < 0 || material.localSolo < 0 {
+	localSol := rl.GetShaderLocation(material.Shader, "sunDirection")
+	if material.localGrama < 0 || material.localSolo < 0 || localSol < 0 {
 		rl.UnloadShader(material.Shader)
-		panic("shader do terreno sem os controles das texturas")
+		panic("shader do terreno sem os controles de textura e luz")
 	}
 	material.Shader.UpdateLocation(rl.ShaderLocMapAlbedo, material.localGrama)
 	material.Shader.UpdateLocation(rl.ShaderLocMapMetalness, material.localSolo)
+	rl.SetShaderValue(material.Shader, localSol, direcaoSol[:], rl.ShaderUniformVec3)
 	material.Grama = rl.LoadTexture("assets/terrain/grass.png")
 	material.Solo = rl.LoadTexture("assets/terrain/soil.png")
 	if material.Grama.ID == 0 || material.Solo.ID == 0 {

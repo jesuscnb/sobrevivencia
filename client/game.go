@@ -24,6 +24,7 @@ type Jogo struct {
 	diagnostico        DiagnosticoDesempenho
 	materialTerreno    MaterialTerreno
 	terrenoTexturizado bool
+	ceu                Ceu
 }
 
 func novoJogo(semente int) *Jogo {
@@ -56,6 +57,7 @@ func novoJogo(semente int) *Jogo {
 	jogo.mundo = novoMundo(ruido, semente, versaoGerador, &jogo.catalogo)
 	jogo.materialTerreno = carregarMaterialTerreno(jogo.mundo.regiaoTerrenoInicial().Modelo)
 	jogo.terrenoTexturizado = true
+	jogo.ceu = carregarCeu()
 
 	if !jogo.mundo.iniciarInimigo(jogo.camera.Position) {
 		fmt.Println("Nenhum ponto livre para o inimigo")
@@ -236,6 +238,7 @@ func gameLoop() {
 
 	jogo.mundo.descarregarTerreno()
 	jogo.materialTerreno.descarregar()
+	jogo.ceu.descarregar()
 	jogo.catalogo.descarregar()
 	jogo.catalogoInimigos.descarregar()
 
