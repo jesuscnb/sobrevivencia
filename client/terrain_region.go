@@ -28,6 +28,7 @@ type RegiaoTerreno struct {
 	RochasCarregadas  bool
 	GramaCarregada    bool
 	BordaCarregada    bool
+	MascaraEstrada    rl.Texture2D
 }
 
 func coordenadaRegiao(x, y, z float32) CoordRegiaoTerreno {
@@ -82,4 +83,17 @@ func (regiao *RegiaoTerreno) indicesDaAmostraGlobal(x, y, z int) (int, int, int,
 	}
 
 	return int(gx - minX), int(gy - minY), int(gz - minZ), true
+}
+
+func (coord CoordRegiaoTerreno) areaXZ() AreaXZ {
+	centroX := float32(coord.X) * tamanhoRegiaoXZ
+	centroZ := float32(coord.Z) * tamanhoRegiaoXZ
+	metade := float32(tamanhoRegiaoXZ) / 2
+
+	return AreaXZ{
+		MinX: centroX - metade,
+		MaxX: centroX + metade,
+		MinZ: centroZ - metade,
+		MaxZ: centroZ + metade,
+	}
 }

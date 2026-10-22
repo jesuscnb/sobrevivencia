@@ -1,6 +1,22 @@
 package main
 
-import rl "github.com/gen2brain/raylib-go/raylib"
+import (
+	"math"
+
+	rl "github.com/gen2brain/raylib-go/raylib"
+)
+
+func raioHorizontalLimites(limites rl.BoundingBox, escala float32) float32 {
+	x := math.Max(
+		math.Abs(float64(limites.Min.X)),
+		math.Abs(float64(limites.Max.X)),
+	)
+	z := math.Max(
+		math.Abs(float64(limites.Min.Z)),
+		math.Abs(float64(limites.Max.Z)),
+	)
+	return float32(math.Hypot(x, z)) * escala
+}
 
 // Cada valor mantém a distância usada antes pelos geradores. A ordem dos
 // argumentos importa: primeiro vem o candidato, depois o objeto já colocado.

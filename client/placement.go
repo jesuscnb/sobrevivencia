@@ -22,6 +22,22 @@ func posicaoNoTerreno(mundo *Mundo, modelo rl.Model, x, z, escala, inclinacaoMin
 	return rl.NewVector3(x, chao.Point.Y-baseDoModelo, z), true
 }
 
+func soloNaturalPreservado(
+	mundo *Mundo,
+	modelo rl.Model,
+	posicao rl.Vector3,
+	escala float32,
+) bool {
+	baseModelo := rl.GetModelBoundingBox(modelo).Min.Y * escala
+	alturaAtual := posicao.Y + baseModelo
+	alturaOriginal := densidadeNoPonto(
+		mundo.ruido, posicao.X, 0, posicao.Z,
+	)
+
+	const quedaMaxima float32 = 0.15
+	return alturaOriginal-alturaAtual <= quedaMaxima
+}
+
 func distanciaHorizontal2(a, b rl.Vector3) float32 {
 	dx := a.X - b.X
 	dz := a.Z - b.Z
@@ -44,19 +60,52 @@ func areasXZSobrepostas(a, b AreaXZ) bool {
 		a.MaxZ > b.MinZ
 }
 
-func pisoTemApoio(mundo *Mundo, area AreaXZ, alturaBase float32) bool {
+// Consulta o indice espacial e confere a area fisica dos obstaculos.
+// A area de influencia do indice e apenas um filtro para a busca.
+func areaTemObstaculo(mundo *Mundo, area AreaXZ) bool {
+	for _, existente := range mundo.ocupacao.consultar(area) {
+		var areaOcupada AreaXZ
 
+		switch existente.Tipo {
+		case TipoPiso, TipoParede, TipoTelhado:
+			areaOcupada = existente.Area
+		case TipoArvore:
+			areaOcupada = areaDaCaixaXZ(caixaDoTronco(existente.Posicao))
+		case TipoRocha:
+			caixa := caixaDaRocha(existente.Posicao, mundo.limitesRocha)
+			areaOcupada = areaDaCaixaXZ(caixa)
+		case TipoCubo:
+			areaOcupada = areaDaCaixaXZ(caixaDoCubo(existente.Posicao))
+		default:
+			continue
+		}
+
+		if areasXZSobrepostas(area, areaOcupada) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func pontosApoioPiso(area AreaXZ) [5][2]float32 {
 	const margem float32 = 0.1
-	const desnivelMaximo float32 = 0.35
-	const inclinacaoMinima float32 = 0.85
 
-	pontos := [5][2]float32{
+	return [5][2]float32{
 		{(area.MinX + area.MaxX) / 2, (area.MinZ + area.MaxZ) / 2},
 		{area.MinX + margem, area.MinZ + margem},
 		{area.MinX + margem, area.MaxZ - margem},
 		{area.MaxX - margem, area.MinZ + margem},
 		{area.MaxX - margem, area.MaxZ - margem},
 	}
+}
+
+func pisoTemApoio(mundo *Mundo, area AreaXZ, alturaBase float32) bool {
+
+	const desnivelMaximo float32 = 0.35
+	const inclinacaoMinima float32 = 0.85
+
+	pontos := pontosApoioPiso(area)
 
 	for _, ponto := range pontos {
 		raio := rl.NewRay(

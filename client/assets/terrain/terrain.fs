@@ -7,6 +7,8 @@ uniform sampler2D grassTexture;
 uniform sampler2D soilTexture;
 uniform vec4 colDiffuse;
 uniform vec3 sunDirection;
+uniform sampler2D roadMask;
+uniform vec2 regionMinXZ;
 
 out vec4 finalColor;
 
@@ -29,6 +31,15 @@ void main() {
     vec3 grass = texture(grassTexture, grassUV).rgb;
     vec3 soil = texture(soilTexture, soilUV).rgb;
     vec3 surface = mix(soil, grass, grassWeight);
+
+    // 64 pixels internos, mais um pixel de borda em cada lado.
+    vec2 roadUV = (vec2(1.0) + (worldPosition.xz - regionMinXZ) * 4.0) / 66.0;
+
+    float roadWeight = texture(roadMask, roadUV).r;
+    roadWeight *= smoothstep(0.45, 0.80, normal.y);
+
+    vec3 roadSurface = soil * vec3(1.10, 0.82, 0.57);
+    surface = mix(surface, roadSurface, roadWeight);
 
     float diffuse = max(dot(normal, normalize(sunDirection)), 0.0);
     float light = 0.56 + 0.44 * diffuse;

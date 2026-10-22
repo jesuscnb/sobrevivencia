@@ -8,6 +8,8 @@ import (
 )
 
 func desenharJogo(jogo *Jogo, mira ResultadoMira) {
+	jogo.minimapa.atualizarTiles(&jogo.mundo,
+		jogo.camera.Position.X, jogo.camera.Position.Z)
 	modeloArvore := jogo.catalogo.modeloObrigatorio(TipoArvore)
 	modeloRocha := jogo.catalogo.modeloObrigatorio(TipoRocha)
 	modeloGrama := jogo.catalogo.modeloObrigatorio(TipoGrama)
@@ -19,7 +21,10 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 	for _, regiao := range jogo.mundo.regioes {
 
 		posicao := regiao.posicaoMundo()
-		jogo.materialTerreno.usarNoModelo(regiao.Modelo, jogo.terrenoTexturizado && !jogo.xRay)
+		jogo.materialTerreno.usarNoModelo(
+			regiao,
+			jogo.terrenoTexturizado && !jogo.xRay,
+		)
 
 		if jogo.xRay {
 			rl.DrawModelWires(
@@ -43,6 +48,29 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 		)
 	}
 
+	if jogo.mostrarLotes {
+		for _, lote := range jogo.mundo.lotesIniciais {
+			if !jogo.mundo.superficieCarregada(
+				lote.Centro.X, lote.Centro.Z,
+			) {
+				continue
+			}
+
+			corLote := color.RGBA{R: 245, G: 210, B: 40, A: 255}
+			for _, id := range jogo.mundo.lotesAssentamentoInicial {
+				if id == lote.ID {
+					corLote = color.RGBA{R: 180, G: 90, B: 230, A: 255}
+					break
+				}
+			}
+			rl.DrawSphere(
+				rl.NewVector3(lote.Centro.X, 1.2, lote.Centro.Z),
+				0.35,
+				corLote,
+			)
+		}
+	}
+
 	for _, peca := range jogo.mundo.construcoes {
 
 		if !jogo.mundo.superficieCarregada(peca.Posicao.X, peca.Posicao.Z) {
@@ -58,6 +86,15 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 			rl.NewVector3(peca.Escala, peca.Escala, peca.Escala),
 			rl.White,
 		)
+	}
+	for _, gerada := range jogo.mundo.pecasGeradas {
+		peca := gerada.Peca
+		if !jogo.mundo.superficieCarregada(peca.Posicao.X, peca.Posicao.Z) {
+			continue
+		}
+		modelo := jogo.catalogo.modeloObrigatorio(peca.Tipo)
+		rl.DrawModelEx(modelo, peca.Posicao, rl.NewVector3(0, 1, 0), peca.Rotacao,
+			rl.NewVector3(peca.Escala, peca.Escala, peca.Escala), rl.White)
 	}
 
 	if jogo.previaConstrucao.Visivel {
@@ -103,6 +140,11 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 	}
 
 	for _, grama := range jogo.mundo.gramas {
+
+		if !grama.Existe {
+			continue
+		}
+
 		rl.DrawModelEx(
 			modeloGrama,
 			grama.Posicao,
@@ -111,6 +153,7 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 			rl.NewVector3(grama.Escala, grama.Escala, grama.Escala),
 			rl.White,
 		)
+
 	}
 
 	for i := range jogo.mundo.inimigos {
@@ -205,6 +248,7 @@ func desenharJogo(jogo *Jogo, mira ResultadoMira) {
 	}
 
 	rl.EndMode3D()
+	jogo.minimapa.desenhar(jogo)
 	rl.DrawFPS(10, 10)
 	rl.DrawCircle(
 		int32(rl.GetScreenWidth()/2),

@@ -25,12 +25,17 @@ type Jogo struct {
 	materialTerreno    MaterialTerreno
 	terrenoTexturizado bool
 	ceu                Ceu
+	mostrarLotes       bool
+	minimapa           Minimapa
+	som                SomJogo
 }
 
 func novoJogo(semente int) *Jogo {
 	ruido := novoRuido(semente)
 
 	jogo := &Jogo{}
+	jogo.minimapa = novoMinimapa()
+	jogo.som = carregarSom(configAudioPadrao())
 	jogo.vida = novaVida(100)
 	jogo.tipoConstrucao = TipoPiso
 
@@ -55,6 +60,8 @@ func novoJogo(semente int) *Jogo {
 	}
 
 	jogo.mundo = novoMundo(ruido, semente, versaoGerador, &jogo.catalogo)
+	jogo.mundo.versaoAssentamento = versaoAssentamentoAtual
+	jogo.mundo.atualizarAssentamento(&jogo.catalogo)
 	jogo.materialTerreno = carregarMaterialTerreno(jogo.mundo.regiaoTerrenoInicial().Modelo)
 	jogo.terrenoTexturizado = true
 	jogo.ceu = carregarCeu()
@@ -68,15 +75,53 @@ func novoJogo(semente int) *Jogo {
 
 func gameLoop() {
 	rl.SetTargetFPS(60)
+	rl.SetWindowState(rl.FlagWindowResizable)
+
 	jogo := novoJogo(54321)
 
 	for !rl.WindowShouldClose() {
+		jogo.som.atualizar()
+		if rl.IsKeyPressed(rl.KeyF10) {
+			jogo.som.alternarSilencio()
+		}
 		if rl.IsKeyPressed(rl.KeyF4) {
 			jogo.diagnostico.Visivel = !jogo.diagnostico.Visivel
 		}
 		if rl.IsKeyPressed(rl.KeyF6) {
 			jogo.terrenoTexturizado = !jogo.terrenoTexturizado
 		}
+		if rl.IsKeyPressed(rl.KeyF7) {
+			jogo.mostrarLotes = !jogo.mostrarLotes
+		}
+		if rl.IsKeyPressed(rl.KeyF8) {
+			const alcanceDiagnosticoLote float32 = 8
+			indice := -1
+			var menorDistancia float32
+
+			for i, lote := range jogo.mundo.lotesIniciais {
+				if !jogo.mundo.superficieCarregada(lote.Centro.X, lote.Centro.Z) {
+					continue
+				}
+
+				dx := lote.Centro.X - jogo.camera.Position.X
+				dz := lote.Centro.Z - jogo.camera.Position.Z
+				distancia := dx*dx + dz*dz
+
+				if indice == -1 || distancia < menorDistancia {
+					indice = i
+					menorDistancia = distancia
+				}
+			}
+
+			if indice == -1 || menorDistancia > alcanceDiagnosticoLote*alcanceDiagnosticoLote {
+				fmt.Println("Nenhum lote candidato carregado por perto")
+			} else {
+				lote := jogo.mundo.lotesIniciais[indice]
+				fmt.Printf("Lote %d: %s\n",
+					lote.ID.Ordem, estadoLote(jogo, lote))
+			}
+		}
+
 		jogo.diagnostico.registrarQuadro(rl.GetFrameTime(), &jogo.mundo)
 
 		if rl.IsKeyPressed(rl.KeyF9) {
@@ -92,7 +137,11 @@ func gameLoop() {
 		}
 
 		if rl.IsKeyPressed(rl.KeyF1) {
+			vidaAntes := jogo.vida.Atual
 			jogo.vida.ReceberDano(10)
+			if jogo.vida.Atual < vidaAntes {
+				jogo.som.tocar(SomDano)
+			}
 		}
 
 		if jogo.vida.Atual == 0 {
@@ -106,6 +155,7 @@ func gameLoop() {
 		}
 
 		atualizarJogador(jogo)
+		jogo.minimapa.descobrir(jogo.camera.Position.X, jogo.camera.Position.Z)
 
 		regiaoAtual := coordenadaRegiao(
 			jogo.camera.Position.X,
@@ -161,7 +211,11 @@ func gameLoop() {
 			rl.GetFrameTime(),
 			jogo.camera.Position,
 		)
+		vidaAntes := jogo.vida.Atual
 		jogo.vida.ReceberDano(dano)
+		if jogo.vida.Atual < vidaAntes {
+			jogo.som.tocar(SomDano)
+		}
 
 		mira := calcularMira(jogo)
 
@@ -194,14 +248,17 @@ func gameLoop() {
 			switch jogo.tipoConstrucao {
 			case TipoPiso:
 				if tentarConstruirPiso(jogo) {
+					jogo.som.tocar(SomConstrucao)
 					jogo.previaConstrucao = calcularPreviaPiso(jogo, mira)
 				}
 			case TipoParede:
 				if tentarConstruirParede(jogo) {
+					jogo.som.tocar(SomConstrucao)
 					jogo.previaConstrucao = calcularPreviaParede(jogo, mira)
 				}
 			case TipoTelhado:
 				if tentarConstruirTelhado(jogo) {
+					jogo.som.tocar(SomConstrucao)
 					jogo.previaConstrucao = calcularPreviaTelhado(jogo, mira)
 				}
 			}
@@ -212,7 +269,11 @@ func gameLoop() {
 		}
 
 		if mira.terrenoAoAlcance && rl.IsKeyPressed(rl.KeyC) {
-			jogo.mundo.cortarTerreno(mira.colisaoTerreno.Point, 2)
+			if jogo.mundo.cortarTerreno(mira.colisaoTerreno.Point, 2) {
+				jogo.som.tocar(SomEscavacao)
+				jogo.minimapa.invalidarArea(mira.colisaoTerreno.Point.X,
+					mira.colisaoTerreno.Point.Z, 3)
+			}
 		}
 
 		if rl.IsKeyPressed(rl.KeyM) {
@@ -237,9 +298,11 @@ func gameLoop() {
 	}
 
 	jogo.mundo.descarregarTerreno()
+	jogo.minimapa.descarregar()
 	jogo.materialTerreno.descarregar()
 	jogo.ceu.descarregar()
 	jogo.catalogo.descarregar()
 	jogo.catalogoInimigos.descarregar()
+	jogo.som.descarregar()
 
 }

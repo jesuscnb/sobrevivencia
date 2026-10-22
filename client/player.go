@@ -104,5 +104,6 @@ func atualizarJogador(jogo *Jogo) {
 		jogo.camera.Position.Y += diferenca
 		jogo.camera.Target.Y += diferenca
 	}
+	jogo.som.atualizarPassos(&jogo.mundo, posicaoAnterior, jogo.camera.Position)
 
 }

@@ -9,10 +9,14 @@ type Arvore struct {
 }
 
 const escalaArvore float32 = 3
+const raioTronco float32 = 0.45
 
 func criarArvoreNoTerreno(mundo *Mundo, modeloArvore rl.Model, x, z float32) (Arvore, bool) {
 	posicao, ok := posicaoNoTerreno(mundo, modeloArvore, x, z, escalaArvore, 0.85)
 	if !ok {
+		return Arvore{}, false
+	}
+	if !soloNaturalPreservado(mundo, modeloArvore, posicao, escalaArvore) {
 		return Arvore{}, false
 	}
 
@@ -22,7 +26,20 @@ func criarArvoreNoTerreno(mundo *Mundo, modeloArvore rl.Model, x, z float32) (Ar
 func gerarArvores(mundo *Mundo, modeloArvore rl.Model, indice *IndiceOcupacao, regiao RegiaoGeracao, candidatos []CandidatoObjeto, quantidade int) []Arvore {
 	arvores := make([]Arvore, 0, quantidade)
 
+	var trechosEstrada [][2]PontoTerritorial
+	if mundo.versaoGerador >= versaoGeradorComReservaEstrada {
+		trechosEstrada = mundo.estradaInicial.trechosNaArea(
+			regiao.Area,
+			alcanceEstrada+raioTronco,
+		)
+	}
+
 	tentar := func(candidato CandidatoObjeto) {
+
+		if sobrepoeFaixaEstrada(trechosEstrada, candidato.X, candidato.Z, raioTronco) {
+			return
+		}
+
 		arvore, encontrouChao := criarArvoreNoTerreno(mundo, modeloArvore, candidato.X, candidato.Z)
 		if !encontrouChao {
 			return
@@ -83,10 +100,8 @@ func (mundo *Mundo) descarregarArvoresRegiao(coord CoordRegiaoTerreno) {
 }
 
 func caixaDoTronco(posicao rl.Vector3) rl.BoundingBox {
-	const raio float32 = 0.45
-
 	return rl.NewBoundingBox(
-		rl.NewVector3(posicao.X-raio, posicao.Y, posicao.Z-raio),
-		rl.NewVector3(posicao.X+raio, posicao.Y+2.4, posicao.Z+raio),
+		rl.NewVector3(posicao.X-raioTronco, posicao.Y, posicao.Z-raioTronco),
+		rl.NewVector3(posicao.X+raioTronco, posicao.Y+2.4, posicao.Z+raioTronco),
 	)
 }

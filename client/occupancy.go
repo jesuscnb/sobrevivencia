@@ -26,6 +26,7 @@ type IDObjeto struct {
 	Tipo             TipoObjeto
 	RegiaoX, RegiaoZ int32
 	Ordem            uint32
+	Gerado           bool
 }
 
 type AreaXZ struct {

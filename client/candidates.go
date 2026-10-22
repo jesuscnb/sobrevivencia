@@ -3,8 +3,9 @@ package main
 import "math/rand"
 
 const (
-	versaoGeradorAnterior = 2
-	versaoGerador         = 3
+	versaoGeradorAnterior          = 2
+	versaoGeradorComReservaEstrada = 4
+	versaoGerador                  = versaoGeradorComReservaEstrada
 )
 
 type RegiaoGeracao struct {

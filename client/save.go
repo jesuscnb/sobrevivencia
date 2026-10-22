@@ -7,7 +7,7 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-const versaoFormatoSave = 5
+const versaoFormatoSave = 8
 
 type VetorSalvo struct {
 	X float32 `json:"x"`
@@ -16,11 +16,24 @@ type VetorSalvo struct {
 }
 
 type GeracaoSalva struct {
-	Semente          int     `json:"semente"`
-	VersaoGerador    int     `json:"versao_gerador"`
-	TipoRuido        string  `json:"tipo_ruido"`
-	FrequenciaRuido  float32 `json:"frequencia_ruido"`
-	AmplitudeTerreno float32 `json:"amplitude_terreno"`
+	Semente            int     `json:"semente"`
+	VersaoGerador      int     `json:"versao_gerador"`
+	VersaoAssentamento int     `json:"versao_assentamento,omitempty"`
+	TipoRuido          string  `json:"tipo_ruido"`
+	FrequenciaRuido    float32 `json:"frequencia_ruido"`
+	AmplitudeTerreno   float32 `json:"amplitude_terreno"`
+}
+
+type LoteDecididoSalvo struct {
+	PlanoX int64  `json:"plano_x"`
+	PlanoZ int64  `json:"plano_z"`
+	Ordem  uint32 `json:"ordem"`
+	Aceito bool   `json:"aceito"`
+}
+
+type CelulaExploradaSalva struct {
+	X int32 `json:"x"`
+	Z int32 `json:"z"`
 }
 
 type JogadorSalvo struct {
@@ -78,6 +91,8 @@ type PartidaSalva struct {
 	Construcoes       []PecaSalva            `json:"construcoes"`
 	AlteracoesTerreno []AmostraTerrenoSalva  `json:"alteracoes_terreno"`
 	Inimigos          []InimigoSalvo         `json:"inimigos"`
+	LotesDecididos    []LoteDecididoSalvo    `json:"lotes_decididos,omitempty"`
+	CelulasExploradas []CelulaExploradaSalva `json:"celulas_exploradas,omitempty"`
 }
 
 func vetorParaSave(v rl.Vector3) VetorSalvo {
@@ -97,11 +112,12 @@ func capturarPartida(jogo *Jogo) (PartidaSalva, error) {
 	estado := PartidaSalva{
 		VersaoFormato: versaoFormatoSave,
 		Geracao: GeracaoSalva{
-			Semente:          jogo.mundo.semente,
-			VersaoGerador:    jogo.mundo.versaoGerador,
-			TipoRuido:        tipoRuidoAtual,
-			FrequenciaRuido:  frequenciaRuidoAtual,
-			AmplitudeTerreno: amplitudeTerrenoAtual,
+			Semente:            jogo.mundo.semente,
+			VersaoGerador:      jogo.mundo.versaoGerador,
+			VersaoAssentamento: jogo.mundo.versaoAssentamento,
+			TipoRuido:          tipoRuidoAtual,
+			FrequenciaRuido:    frequenciaRuidoAtual,
+			AmplitudeTerreno:   amplitudeTerrenoAtual,
 		},
 		Jogador: JogadorSalvo{
 			Posicao:    vetorParaSave(jogo.camera.Position),
@@ -178,6 +194,8 @@ func capturarPartida(jogo *Jogo) (PartidaSalva, error) {
 			tipo = "arvore"
 		case TipoRocha:
 			tipo = "rocha"
+		case TipoGrama:
+			tipo = "grama"
 		default:
 			return PartidaSalva{}, fmt.Errorf("tipo de recurso removido inválido: %d", id.Tipo)
 		}
@@ -224,6 +242,32 @@ func capturarPartida(jogo *Jogo) (PartidaSalva, error) {
 			Rotacao: peca.Rotacao,
 		})
 	}
+	for id, aceito := range jogo.mundo.lotesDecididos {
+		estado.LotesDecididos = append(estado.LotesDecididos, LoteDecididoSalvo{
+			PlanoX: id.Plano.X, PlanoZ: id.Plano.Z, Ordem: id.Ordem, Aceito: aceito,
+		})
+	}
+	for coord := range jogo.minimapa.exploradas {
+		estado.CelulasExploradas = append(estado.CelulasExploradas,
+			CelulaExploradaSalva{X: coord.X, Z: coord.Z})
+	}
+	sort.Slice(estado.CelulasExploradas, func(i, j int) bool {
+		a, b := estado.CelulasExploradas[i], estado.CelulasExploradas[j]
+		if a.X != b.X {
+			return a.X < b.X
+		}
+		return a.Z < b.Z
+	})
+	sort.Slice(estado.LotesDecididos, func(i, j int) bool {
+		a, b := estado.LotesDecididos[i], estado.LotesDecididos[j]
+		if a.PlanoX != b.PlanoX {
+			return a.PlanoX < b.PlanoX
+		}
+		if a.PlanoZ != b.PlanoZ {
+			return a.PlanoZ < b.PlanoZ
+		}
+		return a.Ordem < b.Ordem
+	})
 
 	for _, inimigo := range jogo.mundo.inimigos {
 		estado.Inimigos = append(estado.Inimigos, InimigoSalvo{

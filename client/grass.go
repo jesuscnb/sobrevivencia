@@ -9,16 +9,39 @@ type Grama struct {
 	Posicao rl.Vector3
 	Escala  float32
 	Rotacao float32
+	Existe  bool
 }
 
 func gerarGrama(mundo *Mundo, modeloGrama rl.Model, indice *IndiceOcupacao, regiao RegiaoGeracao, candidatos []CandidatoObjeto, quantidade int) []Grama {
 	gramas := make([]Grama, 0, quantidade)
 
+	limitesGrama := rl.GetModelBoundingBox(modeloGrama)
+
+	var trechosEstrada [][2]PontoTerritorial
+	if mundo.versaoGerador >= versaoGeradorComReservaEstrada {
+		raioMaximo := raioHorizontalLimites(limitesGrama, 3.6)
+		trechosEstrada = mundo.estradaInicial.trechosNaArea(
+			regiao.Area,
+			alcanceEstrada+raioMaximo,
+		)
+	}
+
 	tentar := func(candidato CandidatoObjeto) {
+
+		raioGrama := raioHorizontalLimites(limitesGrama, candidato.Escala)
+		if sobrepoeFaixaEstrada(trechosEstrada, candidato.X, candidato.Z, raioGrama) {
+			return
+		}
+
 		posicao, ok := posicaoNoTerreno(mundo, modeloGrama, candidato.X, candidato.Z, candidato.Escala, 0.9)
 		if !ok {
 			return
 		}
+
+		if !soloNaturalPreservado(mundo, modeloGrama, posicao, candidato.Escala) {
+			return
+		}
+
 		if !podePosicionar(indice, TipoGrama, posicao) {
 			return
 		}
@@ -28,6 +51,7 @@ func gerarGrama(mundo *Mundo, modeloGrama rl.Model, indice *IndiceOcupacao, regi
 			Posicao: posicao,
 			Escala:  candidato.Escala,
 			Rotacao: candidato.Rotacao,
+			Existe:  true,
 		})
 		registrarOcupacao(indice, gramas[len(gramas)-1].ID, TipoGrama, posicao)
 	}
@@ -51,6 +75,12 @@ func (mundo *Mundo) carregarGramaRegiao(coord CoordRegiaoTerreno, modelo rl.Mode
 	area := regiaoGeracaoParaTipo(coord, TipoGrama, mundo.versaoGerador)
 	candidatos := gerarCandidatos(TipoGrama, int64(mundo.semente), area, 400)
 	novas := gerarGrama(mundo, modelo, mundo.ocupacao, area, candidatos, 80)
+	for i := range novas {
+		if _, removida := mundo.recursosRemovidos[novas[i].ID]; removida {
+			novas[i].Existe = false
+			mundo.ocupacao.remover(novas[i].ID)
+		}
+	}
 	mundo.gramas = append(mundo.gramas, novas...)
 	regiao.GramaCarregada = true
 	mundo.removerGramaSobrePisos(area.Area)
@@ -123,4 +153,18 @@ func (mundo *Mundo) removerGramaNaArea(areaPiso AreaXZ) {
 		restantes = append(restantes, grama)
 	}
 	mundo.gramas = restantes
+}
+
+func (mundo *Mundo) removerGramasEscavadas(ids map[IDObjeto]struct{}) {
+	for i := range mundo.gramas {
+		grama := &mundo.gramas[i]
+
+		if _, afetada := ids[grama.ID]; !afetada || !grama.Existe {
+			continue
+		}
+
+		grama.Existe = false
+		mundo.ocupacao.remover(grama.ID)
+		mundo.recursosRemovidos[grama.ID] = struct{}{}
+	}
 }

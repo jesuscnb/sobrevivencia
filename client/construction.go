@@ -41,30 +41,7 @@ func calcularPreviaPiso(jogo *Jogo, mira ResultadoMira) PreviaConstrucao {
 	}
 
 	areaNova := areaPecaXZ(modelo, posicao, escala, 0)
-	podeColocar := true
-
-	for _, existente := range jogo.mundo.ocupacao.consultar(areaNova) {
-		var areaOcupada AreaXZ
-
-		switch existente.Tipo {
-		case TipoPiso, TipoParede, TipoTelhado:
-			areaOcupada = existente.Area
-		case TipoArvore:
-			areaOcupada = areaDaCaixaXZ(caixaDoTronco(existente.Posicao))
-		case TipoRocha:
-			caixa := caixaDaRocha(existente.Posicao, jogo.mundo.limitesRocha)
-			areaOcupada = areaDaCaixaXZ(caixa)
-		case TipoCubo:
-			areaOcupada = areaDaCaixaXZ(caixaDoCubo(existente.Posicao))
-		default:
-			continue
-		}
-
-		if areasXZSobrepostas(areaNova, areaOcupada) {
-			podeColocar = false
-			break
-		}
-	}
+	podeColocar := !areaTemObstaculo(&jogo.mundo, areaNova)
 
 	const raioJogador float32 = 0.35
 	areaJogador := areaAoRedor(jogo.camera.Position, raioJogador)

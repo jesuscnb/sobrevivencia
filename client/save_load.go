@@ -21,6 +21,8 @@ func aplicarRecursosRemovidos(mundo *Mundo, versao int, recursos []RecursoRemovi
 		}
 
 		switch salvo.Tipo {
+		case "grama":
+			id.Tipo = TipoGrama
 		case "cubo":
 			id.Tipo = TipoCubo
 		case "arvore":
@@ -66,6 +68,16 @@ func aplicarRecursosRemovidos(mundo *Mundo, versao int, recursos []RecursoRemovi
 					break
 				}
 			}
+
+		case TipoGrama:
+			for i := range mundo.gramas {
+				if mundo.gramas[i].ID == id {
+					mundo.gramas[i].Existe = false
+					encontrado = true
+					break
+				}
+			}
+
 		}
 
 		if !encontrado {
@@ -73,6 +85,7 @@ func aplicarRecursosRemovidos(mundo *Mundo, versao int, recursos []RecursoRemovi
 			// Em saves antigos, todos os recursos também precisam estar carregados.
 			bordaPendente := mundo.versaoGerador <= versaoGeradorAnterior &&
 				((id.Tipo == TipoArvore && id.Ordem >= 100) ||
+					(id.Tipo == TipoGrama && id.Ordem >= 400) ||
 					(id.Tipo == TipoRocha && id.Ordem >= 200))
 			if versao < 5 || id.Tipo == TipoCubo ||
 				(id.RegiaoX == 0 && id.RegiaoZ == 0 && !bordaPendente) {
@@ -145,6 +158,14 @@ func aplicarConstrucoes(mundo *Mundo, catalogo *Catalogo, versao int, construcoe
 }
 
 func restaurarPartida(jogo *Jogo, estado PartidaSalva) error {
+	minimapaNovo := novoMinimapa()
+	for _, salva := range estado.CelulasExploradas {
+		coord := CelulaExplorada{X: salva.X, Z: salva.Z}
+		if _, repetida := minimapaNovo.exploradas[coord]; repetida {
+			return fmt.Errorf("célula explorada repetida no save: %+v", coord)
+		}
+		minimapaNovo.exploradas[coord] = struct{}{}
+	}
 	if estado.Jogador.VidaMaxima <= 0 ||
 		estado.Jogador.VidaAtual < 0 ||
 		estado.Jogador.VidaAtual > estado.Jogador.VidaMaxima {
@@ -181,10 +202,31 @@ func restaurarPartida(jogo *Jogo, estado PartidaSalva) error {
 	if err == nil {
 		err = aplicarConstrucoes(&mundoNovo, &jogo.catalogo, estado.VersaoFormato, estado.Construcoes)
 	}
+	if err == nil {
+		if estado.Geracao.VersaoAssentamento == 0 && len(estado.LotesDecididos) != 0 {
+			err = fmt.Errorf("save sem assentamento contém decisões de lotes")
+		}
+		for _, salvo := range estado.LotesDecididos {
+			id := IDLote{Plano: CoordPlanoTerritorial{X: salvo.PlanoX, Z: salvo.PlanoZ}, Ordem: salvo.Ordem}
+			if id.Plano != (CoordPlanoTerritorial{}) || int(id.Ordem) >= len(mundoNovo.lotesIniciais) {
+				err = fmt.Errorf("lote desconhecido no save: %+v", id)
+				break
+			}
+			if _, repetido := mundoNovo.lotesDecididos[id]; repetido {
+				err = fmt.Errorf("lote repetido no save: %+v", id)
+				break
+			}
+			mundoNovo.lotesDecididos[id] = salvo.Aceito
+		}
+		if err == nil {
+			mundoNovo.versaoAssentamento = estado.Geracao.VersaoAssentamento
+		}
+	}
 
 	if err == nil {
 		mundoNovo.carregarBordaVegetacaoRegiao(CoordRegiaoTerreno{}, &jogo.catalogo)
 		mundoNovo.carregarBordaVegetacaoRegiao(CoordRegiaoTerreno{X: 1}, &jogo.catalogo)
+		mundoNovo.atualizarAssentamento(&jogo.catalogo)
 	}
 
 	if err == nil && estado.VersaoFormato >= 3 {
@@ -208,6 +250,8 @@ func restaurarPartida(jogo *Jogo, estado PartidaSalva) error {
 	}
 
 	mundoAntigo := jogo.mundo
+	jogo.minimapa.descarregar()
+	jogo.minimapa = minimapaNovo
 	jogo.mundo = mundoNovo
 	jogo.cubosColetados = cubosColetados
 	jogo.inventario = Inventario{

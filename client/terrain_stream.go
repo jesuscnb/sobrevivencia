@@ -22,6 +22,7 @@ func (mundo *Mundo) carregarProximaRegiao(centro CoordRegiaoTerreno, catalogo *C
 		mundo.carregarRochasRegiao(coord, catalogo.modeloObrigatorio(TipoRocha))
 		mundo.carregarGramaRegiao(coord, catalogo.modeloObrigatorio(TipoGrama))
 		mundo.carregarBordaVegetacaoRegiao(coord, catalogo)
+		mundo.atualizarAssentamento(catalogo)
 		mundo.ultimoCarregamento = time.Since(inicio)
 
 		fmt.Printf("Região carregada: %+v | ativas: %d | tempo: %s\n",

@@ -56,6 +56,8 @@ Acima das regiões de malha haverá uma camada de **planos territoriais**. Uma c
 
 O traçado de uma estrada é decidido antes da composição visual local. Cada região adapta seu trecho de terreno, material e ocupação, sem gerar uma estrada independente e desconectada. Assentamentos reservam uma área que pode atravessar várias regiões e montam edifícios com peças e assets reutilizáveis. A busca de rotas em grafos pode usar Gonum quando existir uma rede que justifique essa dependência; regras de localização, relevo e estilo permanecem próprias do jogo. Recast/Detour é candidato para navegação de NPCs, não para gerar estradas ou cidades.
 
+Na área inicial, a estrada principal deve conectar quatro zonas próximas aos cantos por curvas suaves, com acesso à parte central. Ao longo do traçado, o plano propõe lotes para construções futuras com IDs estáveis e acesso pela estrada. Cada lote só é aceito depois de verificar inclinação, apoio e conflitos com estrada, recursos e construções existentes. A reserva de ocupação e a limpeza local de vegetação acontecem junto com a construção efetiva, evitando clareiras vazias; saves anteriores não podem perder objetos ou peças por causa da nova geração.
+
 ## Minimapa
 
 O minimapa é composto por pequenos tiles associados às coordenadas das regiões. Cada tile resume superfície, material, estradas e pontos de interesse; tiles próximos podem ser desenhados com recursos da raylib e guardados em cache. O minimapa em tempo real não renderiza todas as regiões do mundo. Exploração descoberta pelo jogador é persistida à parte da geração. Para cavernas, uma camada ou representação específica será decidida quando houver exploração subterrânea jogável.

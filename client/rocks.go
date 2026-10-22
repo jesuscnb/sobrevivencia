@@ -19,11 +19,31 @@ func gerarRochas(
 ) []Rocha {
 	rochas := make([]Rocha, 0, quantidade)
 
+	raioRocha := raioHorizontalLimites(mundo.limitesRocha, escalaRocha)
+
+	var trechosEstrada [][2]PontoTerritorial
+	if mundo.versaoGerador >= versaoGeradorComReservaEstrada {
+		trechosEstrada = mundo.estradaInicial.trechosNaArea(
+			regiao.Area,
+			alcanceEstrada+raioRocha,
+		)
+	}
+
 	tentar := func(candidato CandidatoObjeto) {
+
+		if sobrepoeFaixaEstrada(trechosEstrada, candidato.X, candidato.Z, raioRocha) {
+			return
+		}
+
 		posicao, ok := posicaoNoTerreno(mundo, modeloRocha, candidato.X, candidato.Z, escalaRocha, 0.9)
 		if !ok {
 			return
 		}
+
+		if !soloNaturalPreservado(mundo, modeloRocha, posicao, escalaRocha) {
+			return
+		}
+
 		if podePosicionar(indice, TipoRocha, posicao) {
 			rocha := Rocha{
 				ID:      IDObjeto{Tipo: TipoRocha, RegiaoX: regiao.X, RegiaoZ: regiao.Z, Ordem: candidato.Ordem},
