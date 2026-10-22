@@ -32,6 +32,8 @@ O carregador prepara regiões próximas, estabelece um limite de trabalho por qu
 
 Um corte altera amostras globais, marca todas as regiões que compartilham os pontos modificados e reconstrói somente as malhas afetadas. Raycasts e colisão devem consultar a região correta após a troca de malha. Antes de usar muitas regiões, validar um caminho de criação de malha sem OBJ temporário e, especificamente, a propriedade e liberação da memória de vértices na versão instalada de raylib-go. O OBJ temporário continua apenas como referência de comparação até essa validação.
 
+Antes de aplicar um corte, verificar se a superfície resultante ainda sustentaria árvores, rochas e construções na área atingida; se algum desses objetos perder o apoio, rejeitar o corte inteiro e informar o motivo ao jogador. A regra considera a superfície de apoio, não apenas a projeção X/Z do objeto, para permitir escavações próximas e galerias profundas que não causem objetos flutuantes. Grama e arbustos sobre uma área efetivamente escavada são removidos; seus IDs devem permanecer removidos após salvar, descarregar e recarregar regiões, inclusive nas divisas.
+
 ## Controle de desempenho
 
 - **Malha:** retirar o OBJ temporário do caminho de carregamento e escavação depois de comprovar, num protótipo pequeno, que a criação e a liberação de uma malha em memória funcionam sem vazamentos ou acesso inválido. Na versão instalada de raylib-go, `UploadMesh` reconhece buffers geridos por Go em `UnloadMesh`, mas `UnloadModel` chama diretamente a função C que também libera as malhas. Não combinar essas chamadas sem definir e verificar a propriedade dos buffers. Continuar usando Polyform para extrair a superfície.
@@ -68,7 +70,7 @@ Uma fronteira de armazenamento oferece operações por região e por plano terri
 
 1. **Duas regiões:** a inicial e uma vizinha compartilham borda; o jogador atravessa com terreno e colisão contínuos. Objetos iniciais e saves v4 continuam funcionando.
 2. **Carregamento dinâmico:** regiões próximas aparecem antes da travessia; regiões distantes são liberadas; voltar à área produz o mesmo terreno e objetos. Medir tempo de geração, tempo por quadro e uso de memória.
-3. **Escavação entre regiões:** um corte sobre a borda atualiza os dois lados e reaparece corretamente após salvar, descarregar e recarregar.
+3. **Escavação entre regiões e suporte:** um corte sobre a borda atualiza os dois lados e reaparece corretamente após salvar, descarregar e recarregar. Cortes que deixariam árvore, rocha ou construção sem apoio são rejeitados sem alterar o terreno; grama e arbustos atingidos por cortes válidos desaparecem e não reaparecem após o recarregamento.
 4. **Aparência:** grama e solo exposto têm texturas estilizadas, iluminação legível e nenhuma emenda perceptível de textura ou normal; um céu estilizado substitui o fundo de cor única e acompanha visualmente o mundo expansível.
 5. **Conteúdo territorial:** uma estrada atravessa ao menos duas regiões sem quebra; um assentamento pequeno usa assets existentes e respeita a ocupação.
 6. **Minimapa:** mostra terreno e estrada ao redor do jogador, mantém posição correta durante a travessia e preserva áreas descobertas.
